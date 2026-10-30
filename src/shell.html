@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>极光冻原 · AURORA HOLLOW</title>
+<style>
+  :root{ --ink:#d9e8f6; --dim:rgba(217,232,246,.52); --line:rgba(190,220,240,.16); }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; overflow:hidden; background:#02060b; color:var(--ink);
+    font-family:"Songti SC","STSong","SimSun","Noto Serif SC",Georgia,serif;
+    -webkit-font-smoothing:antialiased; }
+  canvas#scene{ display:block; width:100%; height:100%; }
+
+  .ui{ position:fixed; inset:0; pointer-events:none; transition:opacity .9s ease; z-index:5; }
+  #brand{ position:absolute; left:38px; top:30px; opacity:.92; text-shadow:0 2px 30px rgba(0,0,0,.6); }
+  #brand h1{ margin:0; font-size:19px; font-weight:400; letter-spacing:.46em; }
+  #brand small{ display:block; margin-top:7px; font-size:9px; letter-spacing:.34em; color:var(--dim);
+    font-family:Georgia,serif; }
+  #brand i{ display:block; width:44px; height:1px; margin-top:14px; background:linear-gradient(90deg,rgba(190,230,255,.55),transparent); }
+
+  #hint{ position:absolute; left:0; right:0; bottom:24px; text-align:center; font-size:11.5px;
+    letter-spacing:.2em; color:var(--dim); transition:opacity 1.2s ease; }
+  #hint b{ font-weight:400; color:rgba(220,240,255,.8); }
+
+  #stat{ position:absolute; right:20px; top:20px; font:10px/1.6 ui-monospace,Consolas,monospace;
+    color:rgba(200,225,245,.4); text-align:right; letter-spacing:.08em; }
+
+  #intro{ position:fixed; inset:0; z-index:20; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; cursor:pointer;
+    background:radial-gradient(ellipse at 50% 62%, rgba(3,9,15,.05) 0%, rgba(2,7,12,.55) 58%, rgba(1,4,8,.92) 100%);
+    transition:opacity 1.8s ease, visibility 1.8s; }
+  #intro.gone{ opacity:0; visibility:hidden; }
+  #intro h2{ margin:0; font-size:clamp(30px,4.6vw,58px); font-weight:400; letter-spacing:.52em;
+    text-indent:.52em; text-shadow:0 0 60px rgba(90,255,210,.18); }
+  #intro .latin{ margin-top:16px; font-family:Georgia,serif; font-size:10px; letter-spacing:.52em;
+    color:rgba(200,230,250,.55); text-indent:.52em; }
+  #intro .rule{ width:120px; height:1px; margin:30px 0 26px;
+    background:linear-gradient(90deg,transparent,rgba(190,235,255,.45),transparent); }
+  #intro .enter{ font-size:12px; letter-spacing:.4em; color:rgba(215,238,255,.72); text-indent:.4em;
+    animation:breathe 4.6s ease-in-out infinite; }
+  #intro .keys{ position:absolute; bottom:38px; font-size:10.5px; letter-spacing:.24em; color:rgba(200,225,245,.4); }
+  @keyframes breathe{ 0%,100%{opacity:.42} 50%{opacity:.95} }
+
+  #loading{ position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
+    background:#01050a; transition:opacity 1.4s ease, visibility 1.4s; }
+  #loading.gone{ opacity:0; visibility:hidden; }
+  #loading span{ font-size:11px; letter-spacing:.46em; color:rgba(190,225,245,.55); text-indent:.46em; }
+  #loading i{ position:absolute; width:180px; height:1px; margin-top:44px; overflow:hidden;
+    background:rgba(140,200,230,.12); }
+  #loading i::after{ content:""; position:absolute; inset:0; width:40%;
+    background:linear-gradient(90deg,transparent,rgba(120,255,210,.8),transparent);
+    animation:scan 2.2s ease-in-out infinite; }
+  @keyframes scan{ 0%{transform:translateX(-120%)} 100%{transform:translateX(320%)} }
+
+  body.photo .ui, body.photo #brand, body.photo #hint{ opacity:0 !important; }
+  body.photo #intro{ display:none; }
+  body.locked{ cursor:none; }
+  body.reveal #intro{ display:none; }
+
+  /* 触屏 */
+  #touch{ position:fixed; inset:0; z-index:8; display:none; pointer-events:none; }
+  body.mobile #touch{ display:block; }
+  body.mobile #hint{ display:none; }
+  body.mobile #brand h1{ font-size:15px; letter-spacing:.36em; }
+  body.mobile #brand{ left:22px; top:20px; }
+  #stick{ position:absolute; left:20px; bottom:24px; width:126px; height:126px; border-radius:50%;
+    border:1px solid rgba(190,225,255,.22);
+    background:radial-gradient(circle,rgba(120,180,220,.10),rgba(8,18,28,.28));
+    pointer-events:auto; touch-action:none; }
+  #knob{ position:absolute; left:50%; top:50%; width:52px; height:52px; margin:-26px; border-radius:50%;
+    background:radial-gradient(circle at 38% 32%,rgba(220,245,255,.6),rgba(80,130,160,.35));
+    box-shadow:0 0 22px rgba(120,220,255,.25); will-change:transform; }
+  #tbtns{ position:static; display:block; pointer-events:none; }
+  #btnJump{ position:absolute; right:18px; bottom:152px; width:64px; height:64px; pointer-events:auto; }
+  #btnRun{ position:absolute; right:18px; bottom:82px; pointer-events:auto; }
+  #btnUse{ position:absolute; right:74px; bottom:82px; pointer-events:auto; }
+  #btnView{ position:absolute; right:130px; bottom:82px; pointer-events:auto; }
+  .tbtn{ width:54px; height:54px; border-radius:50%; border:1px solid rgba(200,235,255,.28);
+    background:rgba(10,22,32,.42); color:rgba(220,240,255,.88); font-size:12px; letter-spacing:.06em;
+    display:flex; align-items:center; justify-content:center; touch-action:none;
+    -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); user-select:none; }
+  .tbtn.small{ width:44px; height:44px; font-size:10px; }
+  .tbtn.on{ background:rgba(70,200,170,.26); border-color:rgba(120,255,210,.55); }
+  #dot{ position:fixed; left:50%; top:50%; width:3px; height:3px; margin:-1.5px; border-radius:50%;
+    background:rgba(210,235,255,.35); z-index:6; pointer-events:none; }
+  body.mobile #dot{ opacity:.18; }
+
+  #prompt{ position:fixed; left:50%; bottom:86px; transform:translateX(-50%); z-index:9;
+    padding:7px 16px; border:1px solid rgba(190,225,255,.22); border-radius:2px;
+    background:rgba(6,14,20,.55); color:rgba(225,240,255,.9); font-size:12px; letter-spacing:.18em;
+    opacity:0; transition:opacity .25s ease; pointer-events:none; white-space:nowrap; }
+  #prompt.show{ opacity:1; }
+
+  #modal{ position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center;
+    background:rgba(2,6,10,.62); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+  #modal.hidden{ display:none; }
+  #modal .panel{ width:min(560px,88vw); max-height:82vh; overflow:auto; padding:26px 30px;
+    background:linear-gradient(180deg,rgba(16,21,24,.97),rgba(9,13,16,.97));
+    border:1px solid rgba(200,225,245,.16); box-shadow:0 30px 80px rgba(0,0,0,.55); }
+  #modal h3{ margin:0 0 14px; font-size:16px; font-weight:400; letter-spacing:.28em; color:#e2edf7; }
+  #modal .body{ font-size:13.5px; line-height:2; color:rgba(215,228,240,.85); white-space:pre-wrap; }
+  #modal textarea{ width:100%; height:118px; margin-top:12px; padding:10px 12px;
+    background:rgba(236,228,208,.94); color:#241c12; border:none; outline:none;
+    font:14px/1.7 "Songti SC",serif; resize:vertical; }
+  #modal .btns{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+  #modal button{ background:transparent; border:1px solid rgba(190,225,255,.3); color:#dcebf8;
+    padding:8px 18px; font:12px/1 "Songti SC",serif; letter-spacing:.2em; cursor:pointer; }
+  #modal button:hover{ background:rgba(120,200,255,.12); }
+
+  #rotate{ position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center;
+    background:#050a0f; color:#cfe4f5; font-size:15px; letter-spacing:.4em; }
+  body.mobile.portrait #rotate{ display:flex; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div class="ui" id="ui">
+  <div id="brand">
+    <h1>极光冻原</h1>
+    <small>AURORA HOLLOW · 极夜漫游</small>
+    <i></i>
+  </div>
+  <div id="stat"></div>
+  <div id="hint">
+    <b>W A S D</b> 行走 · <b>Shift</b> 疾行 · <b>Space</b> 跳跃 · <b>V</b> 第一 / 第三人称 ·
+    <b>鼠标</b> 环视 · <b>P</b> 拍照 · <b>H</b> 隐藏界面
+  </div>
+</div>
+
+<div id="dot"></div>
+
+<div id="prompt"></div>
+
+<div id="modal" class="hidden">
+  <div class="panel">
+    <h3 id="mtitle"></h3>
+    <div class="body" id="mbody"></div>
+    <textarea id="minput" spellcheck="false" placeholder="在纸上写点什么…"></textarea>
+    <div class="btns">
+      <button id="mok">保存</button>
+      <button id="mclose">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="rotate">请横屏游玩</div>
+
+<div id="touch">
+  <div id="stick"><div id="knob"></div></div>
+  <div id="tbtns">
+    <div class="tbtn small" id="btnView">视角</div>
+    <div class="tbtn small" id="btnRun">跑</div>
+    <div class="tbtn small" id="btnUse">用</div>
+    <div class="tbtn" id="btnJump">跳</div>
+  </div>
+</div>
+
+<div id="intro">
+  <h2>极光之下</h2>
+  <div class="latin">AURORA HOLLOW</div>
+  <div class="rule"></div>
+  <div class="enter">点击进入</div>
+  <div class="keys">建议使用耳机 · 走进木屋，靠近炉火</div>
+</div>
+
+<div id="loading"><span>正在生成冻原…</span><i></i></div>
+
+<script>/*__THREE__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>
